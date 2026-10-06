@@ -33,7 +33,7 @@ import static com.ybm.betterbounty.BetterBounty.LOGGER;
 public class BountyLogic {
 
     public enum ObjectiveType {
-        ITEM, ITEM_TAG, CRITERIA
+        ITEM, ITEM_TAG, CRITERIA, ENTITY
     }
 
     public static class BountyRequirement {
@@ -53,6 +53,7 @@ public class BountyLogic {
 
             if (logicId.endsWith(":item_tag")) this.type = ObjectiveType.ITEM_TAG;
             else if (logicId.endsWith(":criteria")) this.type = ObjectiveType.CRITERIA;
+            else if (logicId.endsWith(":entity")) this.type = ObjectiveType.ENTITY;
             else this.type = ObjectiveType.ITEM;
         }
 
@@ -60,8 +61,12 @@ public class BountyLogic {
             return type == ObjectiveType.CRITERIA && current >= amount;
         }
 
+        public boolean isEntityCompleted() {
+            return type == ObjectiveType.ENTITY && current >= amount;
+        }
+
         public boolean matches(ItemStack stack) {
-            if (type == ObjectiveType.CRITERIA) return false;
+            if (type == ObjectiveType.CRITERIA || type == ObjectiveType.ENTITY) return false;
             if (stack.isEmpty()) return false;
 
             if (type == ObjectiveType.ITEM_TAG) {
@@ -190,6 +195,14 @@ public class BountyLogic {
     public static boolean checkAndConsumeAll(ServerPlayer player, @Nullable INetwork network,
                                               @Nullable IItemHandler externalContainer,
                                               List<BountyRequirement> requirements) {
+        //entity check
+        for (BountyRequirement req : requirements) {
+            if (req.type == ObjectiveType.ENTITY && !req.isEntityCompleted()) {
+                player.sendSystemMessage(Component.literal("击杀进度不足：" + req.content + " " + req.current + "/" + req.amount));
+                return false;
+            }
+        }
+
         // 1. criteria check
         for (BountyRequirement req : requirements) {
             if (req.type == ObjectiveType.CRITERIA && !req.isCriteriaCompleted()) {
@@ -200,7 +213,7 @@ public class BountyLogic {
         }
 
         List<BountyRequirement> itemReqs = requirements.stream()
-                .filter(r -> r.type != ObjectiveType.CRITERIA)
+                .filter(r -> r.type != ObjectiveType.CRITERIA && r.type != ObjectiveType.ENTITY)
                 .collect(Collectors.toList());
         if (itemReqs.isEmpty()) return true;
 
