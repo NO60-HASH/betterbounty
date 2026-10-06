@@ -196,11 +196,12 @@ public class BountyLogic {
                                               @Nullable IItemHandler externalContainer,
                                               List<BountyRequirement> requirements) {
         //entity check
-        for (BountyRequirement req : requirements) {
-            if (req.type == ObjectiveType.ENTITY && !req.isEntityCompleted()) {
-                player.sendSystemMessage(Component.literal("击杀进度不足：" + req.content + " " + req.current + "/" + req.amount));
-                return false;
-            }
+        List<BountyRequirement> incompleteEntities = requirements.stream()
+                .filter(r -> r.type == ObjectiveType.ENTITY && !r.isEntityCompleted())
+                .collect(Collectors.toList());
+        if (!incompleteEntities.isEmpty()) {
+            sendEntityMissingMessage(player, incompleteEntities);
+            return false;
         }
 
         // 1. criteria check
@@ -334,6 +335,25 @@ public class BountyLogic {
         }
         if (sb.length() > 2) sb.setLength(sb.length() - 2);
         player.sendSystemMessage(Component.literal("物品不足，缺失：" + sb.toString() + "。已标记到 JEI。"));
+    }
+    //输出击杀进度缺少信息
+    private static void sendEntityMissingMessage(ServerPlayer player, List<BountyRequirement> entityReqs) {
+        Component msg = Component.literal("击杀进度不足：");
+        for (int i = 0; i < entityReqs.size(); i++) {
+            BountyRequirement req = entityReqs.get(i);
+            if (i > 0) msg = msg.copy().append(Component.literal(", "));
+            msg = msg.copy().append(getEntityName(req.content))
+                     .append(Component.literal(" " + req.current + "/" + req.amount));
+        }
+        player.sendSystemMessage(msg);
+    }
+    //获取实体名称
+    private static Component getEntityName(String content) {
+        ResourceLocation rl = ResourceLocation.tryParse(content);
+        if (rl == null) return Component.literal(content);
+        var entityType = ForgeRegistries.ENTITY_TYPES.getValue(rl);
+        if (entityType == null) return Component.literal(content);
+        return Component.translatable(entityType.getDescriptionId());
     }
 
     private static void finishBounty(ServerPlayer player, ItemStack bounty) {
